@@ -14,7 +14,7 @@ app.use("/api/auth", authRoutes);
 app.get("/api/profile", isAuthenticated, getProfile);
 
 app.get("/", (req, res) => {
-  res.send("✅ API is running...");
+  res.send("API is running...");
 });
 
 // Start server
