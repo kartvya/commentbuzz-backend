@@ -1,9 +1,28 @@
 import { Router } from "express";
-import { register } from "../controllers/auth.controller";
+import { login, register } from "../controllers/auth.controller";
+import { body } from "express-validator";
+import { validateRequest } from "../middlewares/validateRequest";
 
 const router = Router();
 
-//@ts-ignore
-router.post("/register", register);
+router.post(
+  "/register",
+  [
+    body("username").notEmpty().withMessage("Username is required."),
+    body("email").isEmail().withMessage("Please provide a valid email."),
+    body("password")
+      .isLength({ min: 6 })
+      .withMessage("Password must be at least 6 characters long."),
+  ],
+  validateRequest,
+  register
+);
+
+router.post(
+  "/login",
+  [body("email").isEmail().withMessage("Please provide a valid email.")],
+  validateRequest,
+  login
+);
 
 export default router;
