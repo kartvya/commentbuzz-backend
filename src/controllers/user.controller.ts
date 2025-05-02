@@ -16,7 +16,7 @@ export const getProfile = async (
       return;
     }
 
-    const user = await User.findById(userId).select("-password"); // exclude password
+    const user = await User.findById(userId).select("-password");
 
     if (!user) {
       res.status(404).json({ success: false, message: "User not found" });

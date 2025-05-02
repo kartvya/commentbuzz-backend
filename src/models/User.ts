@@ -5,6 +5,8 @@ export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
+  profilePic: string;
+  gender: string;
 }
 
 // 2. Define the Schema
@@ -29,8 +31,13 @@ const UserSchema: Schema = new Schema(
       required: [true, "Password is required"],
       minlength: 6,
     },
+    gender: {
+      type: String,
+      default: "",
+    },
+    profilePic: { type: String, default: "" },
   },
-  { timestamps: true } // auto-add createdAt and updatedAt
+  { timestamps: true }
 );
 
 // 3. Export the model
