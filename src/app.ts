@@ -3,11 +3,14 @@ import { connectDB } from "./config/db";
 import { getProfile } from "./controllers/user.controller";
 import { isAuthenticated } from "./middlewares/isAuthenticated";
 import authRoutes from "./routes/auth.routes";
+import cookieParser from "cookie-parser";
 
 const PORT = process.env.PORT || 8000;
 const app = express();
 
 app.use(express.json());
+
+app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
 
