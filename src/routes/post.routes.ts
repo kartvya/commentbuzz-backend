@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { uploadPost } from "../controllers/post.controller";
+import { getAllPosts, uploadPost } from "../controllers/post.controller";
 import { isAuthenticated } from "../middlewares/isAuthenticated";
 import { upload } from "../utils/multer";
 
@@ -11,5 +11,7 @@ router.post(
   upload.array("media", 5),
   uploadPost
 );
+
+router.get("/getPost", isAuthenticated, getAllPosts);
 
 export default router;
