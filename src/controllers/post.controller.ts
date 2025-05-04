@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import PostModel from "../models/Post";
 import cloudinary from "../utils/cloudinary";
+import mongoose from "mongoose";
+import User from "../models/User";
 
 // Upload a new post
 export const uploadPost = async (
@@ -73,7 +75,10 @@ export const getPostById = async (
   try {
     const { id } = req.params;
 
-    const post = await PostModel.findById(id).populate("user", "name email");
+    const post = await PostModel.findById(id).populate(
+      "user",
+      "username profilePic"
+    );
 
     if (!post) {
       res.status(404).json({
@@ -196,5 +201,92 @@ export const deletePost = async (
       success: false,
       message: "Something went wrong while deleting the post.",
     });
+  }
+};
+
+export const handleVote = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { type, userId, postId } = req.body;
+
+    const post = await PostModel.findById(postId);
+
+    if (!post) {
+      res.status(404).json({ success: false, message: "Post not found" });
+      return;
+    }
+
+    const hasUpvoted = post.upvotes.some((id) => id.toString() === userId);
+    const hasDownvoted = post.downvotes.some((id) => id.toString() === userId);
+
+    let delta = 0;
+
+    if (type === "upvote") {
+      if (hasUpvoted) {
+        // undo upvote
+        post.upvotes = post.upvotes.filter((id) => id.toString() !== userId);
+        delta = -1;
+      } else {
+        // new upvote (possibly flipping a downvote)
+        if (hasDownvoted) {
+          post.downvotes = post.downvotes.filter(
+            (id) => id.toString() !== userId
+          );
+          delta += 1; // remove the −1 from the earlier downvote
+        }
+        post.upvotes.push(new mongoose.Types.ObjectId(userId));
+        delta += 1;
+      }
+    } else if (type === "downvote") {
+      if (hasDownvoted) {
+        // undo downvote
+        post.downvotes = post.downvotes.filter(
+          (id) => id.toString() !== userId
+        );
+        delta = +1;
+      } else {
+        // new downvote (possibly flipping an upvote)
+        if (hasUpvoted) {
+          post.upvotes = post.upvotes.filter((id) => id.toString() !== userId);
+          delta -= 1; // remove the +1 from the earlier upvote
+        }
+        post.downvotes.push(new mongoose.Types.ObjectId(userId));
+        delta -= 1;
+      }
+    } else if (type === "none") {
+      // If the user has voted, remove the vote (either upvote or downvote)
+      if (hasUpvoted) {
+        post.upvotes = post.upvotes.filter((id) => id.toString() !== userId);
+        delta -= 1; // remove the upvote
+      } else if (hasDownvoted) {
+        post.downvotes = post.downvotes.filter(
+          (id) => id.toString() !== userId
+        );
+        delta += 1; // remove the downvote
+      }
+    } else {
+      res.status(400).json({ success: false, message: "Invalid vote type." });
+      return;
+    }
+
+    // 4. Apply coin changes
+    post.buzzCoinsEarned += delta;
+    await post.save();
+
+    // 5. Credit/debit the post’s author
+    await User.findByIdAndUpdate(
+      post.user,
+      { $inc: { buzzCoins: delta } },
+      { new: true }
+    );
+
+    // 6. Return updated post (and author’s new balance if desired)
+    res.status(200).json({ success: true, data: post });
+  } catch (err) {
+    const errorMessage =
+      err instanceof Error ? err.message : "An unknown error occurred";
+    res.status(400).json({ success: false, message: errorMessage });
   }
 };

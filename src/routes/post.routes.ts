@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { getAllPosts, uploadPost } from "../controllers/post.controller";
+import {
+  getAllPosts,
+  handleVote,
+  uploadPost,
+} from "../controllers/post.controller";
 import { isAuthenticated } from "../middlewares/isAuthenticated";
 import { upload } from "../utils/multer";
 
@@ -13,5 +17,7 @@ router.post(
 );
 
 router.get("/getPost", isAuthenticated, getAllPosts);
+
+router.patch("/voteToggle", isAuthenticated, handleVote);
 
 export default router;
