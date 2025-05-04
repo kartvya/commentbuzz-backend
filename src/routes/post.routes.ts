@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  deletePost,
   getAllPosts,
   handleVote,
   uploadPost,
@@ -19,5 +20,7 @@ router.post(
 router.get("/getPost", isAuthenticated, getAllPosts);
 
 router.patch("/voteToggle", isAuthenticated, handleVote);
+
+router.delete("/deletePost/:postId", isAuthenticated, deletePost);
 
 export default router;

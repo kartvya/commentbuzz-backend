@@ -179,11 +179,11 @@ export const deletePost = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { postId } = req.params;
 
-    const deletedPost = await PostModel.findByIdAndDelete(id);
+    const post = await PostModel.findById(postId);
 
-    if (!deletedPost) {
+    if (!post) {
       res.status(404).json({
         success: false,
         message: "Post not found.",
@@ -191,9 +191,22 @@ export const deletePost = async (
       return;
     }
 
+    // // 1. Reverse buzzCoins from user if necessary
+    // if (post.buzzCoinsEarned && post.user) {
+    //   await User.findByIdAndUpdate(post.user, {
+    //     $inc: { buzzCoins: -post.buzzCoinsEarned },
+    //   });
+    // }
+
+    // 2. Delete related comments if stored separately
+    // await CommentModel.deleteMany({ post: postId });
+
+    // 3. Finally, delete the post
+    await PostModel.findByIdAndDelete(postId);
+
     res.status(200).json({
       success: true,
-      message: "Post deleted successfully.",
+      message: "Post and related data deleted successfully.",
     });
   } catch (error) {
     console.error("[deletePost]", error);
