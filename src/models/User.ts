@@ -6,10 +6,13 @@ export interface IUser extends Document {
   email: string;
   password: string;
   profilePic: string;
-  gender: string;
+  bio: string;
+  fcmToken: string;
+  buzzCoins: string;
+  followers: mongoose.Schema.Types.ObjectId;
+  following: mongoose.Schema.Types.ObjectId;
 }
 
-// 2. Define the Schema
 const UserSchema: Schema = new Schema(
   {
     username: {
@@ -31,11 +34,12 @@ const UserSchema: Schema = new Schema(
       required: [true, "Password is required"],
       minlength: 6,
     },
-    gender: {
-      type: String,
-      default: "",
-    },
     profilePic: { type: String, default: "" },
+    bio: { type: String, default: "" },
+    fcmToken: { type: String },
+    buzzCoins: { type: Number, default: 0 },
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );
