@@ -24,7 +24,7 @@ const PostSchema: Schema = new Schema(
     downvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     views: { type: Number, default: 0 },
     buzzCoinsEarned: { type: Number, default: 0 },
-    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
+    commentCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

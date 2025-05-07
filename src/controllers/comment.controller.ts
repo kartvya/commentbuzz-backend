@@ -1,321 +1,174 @@
 import { Request, Response } from "express";
-import PostModel from "../models/Post";
-import cloudinary from "../utils/cloudinary";
 import mongoose from "mongoose";
-import User from "../models/User";
 import { AuthRequest } from "../middlewares/isAuthenticated";
 import CommentModel from "../models/Comment";
+import PostModel from "../models/Post";
 
-// Upload a new post
 export const uploadComment = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, body } = req as any;
-    const { description = "" } = body;
+    const userId = req.userId;
+    const { postId, description = "" } = req.body;
 
-    const hasText = description.trim();
-
-    if (!hasText) {
+    if (!description.trim()) {
       res.status(400).json({
         success: false,
-        message: "Post must contain at least text or media.",
+        message: "Comment must contain text.",
       });
       return;
     }
 
-    // Create the post
-    const newPost = await CommentModel.create({
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid post ID.",
+      });
+      return;
+    }
+
+    const postExists = await PostModel.exists({ _id: postId });
+    if (!postExists) {
+      res.status(404).json({
+        success: false,
+        message: "Post not found.",
+      });
+      return;
+    }
+
+    const newComment = await CommentModel.create({
       user: userId,
-      description: description.trim(),
+      post: postId,
+      text: description.trim(),
     });
+
+    await PostModel.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } });
 
     res.status(201).json({
       success: true,
-      message: "Comment created successfully.",
-      post: newPost,
+      message: "Comment added successfully.",
+      comment: newComment,
     });
   } catch (error) {
     console.error("[uploadComment]", error);
     res.status(500).json({
       success: false,
-      message: "Something went wrong while creating the comment.",
+      message: "Something went wrong while uploading the comment.",
     });
   }
 };
 
-// Get a single post by ID
-export const getPostById = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { postId } = req.params;
+export const getCommentsByPostId = async (req: Request, res: Response) => {
+  const { postId } = req.params;
 
-    const post = await PostModel.findById(postId).populate(
-      "user",
-      "username profilePic"
-    );
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    return res.status(400).json({ error: "Invalid Post ID" });
+  }
+
+  try {
+    const post = await PostModel.findById(postId)
+      .populate("user", "_id name username profilePic") // populate post author
+      .lean();
 
     if (!post) {
-      res.status(404).json({
-        success: false,
-        message: "Post not found.",
-      });
-      return;
+      return res.status(404).json({ error: "Post not found" });
     }
 
-    res.status(200).json({
+    const comments = await CommentModel.find({ post: postId })
+      .sort({ createdAt: -1 })
+      .populate("user", "_id name username profilePic") // populate comment author
+      .lean();
+
+    return res.status(200).json({
       success: true,
       post,
+      comments,
     });
-  } catch (error) {
-    console.error("[getPostById]", error);
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong while fetching the post.",
-    });
+  } catch (err) {
+    console.error("Error fetching comments by post ID:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-export const getOnlyUsersPost = async (
+// export const getCommentsByPostId = async (
+//   req: Request,
+//   res: Response
+// ): Promise<void> => {
+//   try {
+//     const { postId } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(postId)) {
+//       res.status(400).json({
+//         success: false,
+//         message: "Invalid post ID.",
+//       });
+//       return;
+//     }
+
+//     const comments = await CommentModel.find({ post: postId })
+//       .populate("user", "username profilePic")
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     res.status(200).json({
+//       success: true,
+//       comments,
+//     });
+//   } catch (error) {
+//     console.error("[getCommentsByPostId]", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch comments.",
+//     });
+//   }
+// };
+
+export const deleteComment = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-
+    const { commentId } = req.params;
     const userId = req.userId;
-    const posts = await PostModel.find({ user: userId })
-      .populate("user", "username profilePic")
-      .lean()
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
 
-    if (!posts) {
-      res.status(404).json({
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      res.status(400).json({
         success: false,
-        message: "Post not found.",
+        message: "Invalid comment ID.",
       });
       return;
     }
 
-    res.status(200).json({
-      success: true,
-      posts,
-    });
-  } catch (error) {
-    console.error("[getPostById]", error);
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong while fetching the post.",
-    });
-  }
-};
+    const comment = await CommentModel.findById(commentId);
 
-export const getAllPosts = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-
-    const posts = await PostModel.find()
-      .populate("user", "username profilePic")
-      .lean()
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
-
-    const total = await PostModel.countDocuments();
-
-    res.status(200).json({
-      success: true,
-      message: "Posts fetched successfully.",
-      data: {
-        posts,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    console.error("[getAllPosts]", error);
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong while fetching posts.",
-    });
-  }
-};
-
-// Update a post by ID
-export const updatePost = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { description } = req.body;
-
-    const updatedPost = await PostModel.findByIdAndUpdate(
-      id,
-      { description },
-      { new: true }
-    );
-
-    if (!updatedPost) {
+    if (!comment) {
       res.status(404).json({
         success: false,
-        message: "Post not found.",
+        message: "Comment not found.",
       });
       return;
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Post updated successfully.",
-      post: updatedPost,
-    });
-  } catch (error) {
-    console.error("[updatePost]", error);
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong while updating the post.",
-    });
-  }
-};
-
-// Delete a post by ID
-export const deletePost = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { postId } = req.params;
-
-    const post = await PostModel.findById(postId);
-
-    if (!post) {
-      res.status(404).json({
+    if (comment.user.toString() !== userId) {
+      res.status(403).json({
         success: false,
-        message: "Post not found.",
+        message: "You are not authorized to delete this comment.",
       });
       return;
     }
 
-    // // 1. Reverse buzzCoins from user if necessary
-    // if (post.buzzCoinsEarned && post.user) {
-    //   await User.findByIdAndUpdate(post.user, {
-    //     $inc: { buzzCoins: -post.buzzCoinsEarned },
-    //   });
-    // }
-
-    // 2. Delete related comments if stored separately
-    // await CommentModel.deleteMany({ post: postId });
-
-    // 3. Finally, delete the post
-    await PostModel.findByIdAndDelete(postId);
+    await comment.deleteOne();
 
     res.status(200).json({
       success: true,
-      message: "Post and related data deleted successfully.",
+      message: "Comment deleted successfully.",
     });
   } catch (error) {
-    console.error("[deletePost]", error);
+    console.error("[deleteComment]", error);
     res.status(500).json({
       success: false,
-      message: "Something went wrong while deleting the post.",
+      message: "Something went wrong while deleting the comment.",
     });
-  }
-};
-
-export const handleVote = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { type, userId, postId } = req.body;
-
-    const post = await PostModel.findById(postId);
-
-    if (!post) {
-      res.status(404).json({ success: false, message: "Post not found" });
-      return;
-    }
-
-    const hasUpvoted = post.upvotes.some((id) => id.toString() === userId);
-    const hasDownvoted = post.downvotes.some((id) => id.toString() === userId);
-
-    let delta = 0;
-
-    if (type === "upvote") {
-      if (hasUpvoted) {
-        // undo upvote
-        post.upvotes = post.upvotes.filter((id) => id.toString() !== userId);
-        delta = -1;
-      } else {
-        // new upvote (possibly flipping a downvote)
-        if (hasDownvoted) {
-          post.downvotes = post.downvotes.filter(
-            (id) => id.toString() !== userId
-          );
-          delta += 1; // remove the −1 from the earlier downvote
-        }
-        post.upvotes.push(new mongoose.Types.ObjectId(userId));
-        delta += 1;
-      }
-    } else if (type === "downvote") {
-      if (hasDownvoted) {
-        // undo downvote
-        post.downvotes = post.downvotes.filter(
-          (id) => id.toString() !== userId
-        );
-        delta = +1;
-      } else {
-        // new downvote (possibly flipping an upvote)
-        if (hasUpvoted) {
-          post.upvotes = post.upvotes.filter((id) => id.toString() !== userId);
-          delta -= 1; // remove the +1 from the earlier upvote
-        }
-        post.downvotes.push(new mongoose.Types.ObjectId(userId));
-        delta -= 1;
-      }
-    } else if (type === "none") {
-      // If the user has voted, remove the vote (either upvote or downvote)
-      if (hasUpvoted) {
-        post.upvotes = post.upvotes.filter((id) => id.toString() !== userId);
-        delta -= 1; // remove the upvote
-      } else if (hasDownvoted) {
-        post.downvotes = post.downvotes.filter(
-          (id) => id.toString() !== userId
-        );
-        delta += 1; // remove the downvote
-      }
-    } else {
-      res.status(400).json({ success: false, message: "Invalid vote type." });
-      return;
-    }
-
-    // 4. Apply coin changes
-    post.buzzCoinsEarned += delta;
-    await post.save();
-
-    // 5. Credit/debit the post’s author
-    await User.findByIdAndUpdate(
-      post.user,
-      { $inc: { buzzCoins: delta } },
-      { new: true }
-    );
-
-    // 6. Return updated post (and author’s new balance if desired)
-    res.status(200).json({ success: true, data: post });
-  } catch (err) {
-    const errorMessage =
-      err instanceof Error ? err.message : "An unknown error occurred";
-    res.status(400).json({ success: false, message: errorMessage });
   }
 };
