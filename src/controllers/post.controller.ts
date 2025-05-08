@@ -4,6 +4,7 @@ import cloudinary from "../utils/cloudinary";
 import mongoose from "mongoose";
 import User from "../models/User";
 import { AuthRequest } from "../middlewares/isAuthenticated";
+import CommentModel from "../models/Comment";
 
 // Upload a new post
 export const uploadPost = async (
@@ -220,8 +221,15 @@ export const deletePost = async (
   try {
     const { postId } = req.params;
 
-    const post = await PostModel.findById(postId);
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid post ID.",
+      });
+      return;
+    }
 
+    const post = await PostModel.findById(postId);
     if (!post) {
       res.status(404).json({
         success: false,
@@ -230,23 +238,39 @@ export const deletePost = async (
       return;
     }
 
-    // // 1. Reverse buzzCoins from user if necessary
-    // if (post.buzzCoinsEarned && post.user) {
-    //   await User.findByIdAndUpdate(post.user, {
-    //     $inc: { buzzCoins: -post.buzzCoinsEarned },
-    //   });
-    // }
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // 2. Delete related comments if stored separately
-    // await CommentModel.deleteMany({ post: postId });
+    try {
+      // 1. Reverse buzzCoins from user
+      if (post.buzzCoinsEarned && post.user) {
+        await User.findByIdAndUpdate(
+          post.user,
+          {
+            $inc: { buzzCoins: -post.buzzCoinsEarned },
+          },
+          { session }
+        );
+      }
 
-    // 3. Finally, delete the post
-    await PostModel.findByIdAndDelete(postId);
+      // 2. Delete related comments
+      await CommentModel.deleteMany({ post: postId }).session(session);
 
-    res.status(200).json({
-      success: true,
-      message: "Post and related data deleted successfully.",
-    });
+      // 3. Delete the post
+      await PostModel.findByIdAndDelete(postId).session(session);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.status(200).json({
+        success: true,
+        message: "Post and related data deleted successfully.",
+      });
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
+    }
   } catch (error) {
     console.error("[deletePost]", error);
     res.status(500).json({

@@ -5,8 +5,8 @@ export interface IComment extends Document {
   user: mongoose.Types.ObjectId;
   text: string;
   parentComment?: mongoose.Types.ObjectId;
-  upvotes: number;
-  downvotes: number;
+  upvotes: mongoose.Types.ObjectId[];
+  downvotes: mongoose.Types.ObjectId[];
   buzzCoins: number;
   createdAt: Date;
   updatedAt: Date;
@@ -34,14 +34,8 @@ const commentSchema = new Schema<IComment>(
       ref: "Comment",
       default: null,
     },
-    upvotes: {
-      type: Number,
-      default: 0,
-    },
-    downvotes: {
-      type: Number,
-      default: 0,
-    },
+    upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    downvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     buzzCoins: {
       type: Number,
       default: 0,
