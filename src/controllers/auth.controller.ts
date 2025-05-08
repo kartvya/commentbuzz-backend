@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/User";
 import jwt from "jsonwebtoken";
+import { generateTokens } from "../utils/generateTokens";
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -66,18 +67,21 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 4. Generate JWT Token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "7d" } // Token will expire in 7 days
-    );
+    const { accessToken, refreshToken } = generateTokens(user?._id as string);
 
-    // 5. Send response
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // ✅ Send access token and user info
     res.status(200).json({
       success: true,
       message: "Logged in successfully",
-      token, // JWT token
+      accessToken,
+      refreshToken,
       user: {
         id: user._id,
         username: user.username,
@@ -87,5 +91,36 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const refreshToken = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      res.status(401).json({ message: "No refresh token provided" });
+      return;
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH!) as {
+      userId: string;
+    };
+
+    const accessToken = jwt.sign(
+      { userId: decoded.userId },
+      process.env.JWT_SECRET!,
+      {
+        expiresIn: "15m",
+      }
+    );
+
+    res.status(200).json({ accessToken });
+  } catch (err) {
+    console.error("Refresh token error:", err);
+    res.status(403).json({ message: "Invalid refresh token" });
   }
 };
