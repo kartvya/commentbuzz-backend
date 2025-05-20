@@ -1,4 +1,3 @@
-import cookieParser from "cookie-parser";
 import express from "express";
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/auth.routes";
@@ -8,13 +7,19 @@ import commentRoutes from "./routes/comment.routes";
 import cors from "cors";
 
 const PORT = process.env.PORT || 8000;
+
 const app = express();
 
 app.use(express.json());
 
-app.use(cookieParser());
-
-app.use(cors({ origin: "*", credentials: true }));
+app.use(
+  cors({
+    origin: [
+      "https://9e60-2401-4900-5043-3ffd-656a-8eae-73b7-d4e3.ngrok-free.app",
+    ],
+    credentials: true,
+  })
+);
 
 app.use("/api/auth", authRoutes);
 

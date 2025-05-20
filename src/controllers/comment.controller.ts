@@ -243,3 +243,40 @@ export const handleCommentVote = async (
     res.status(400).json({ success: false, message: errorMessage });
   }
 };
+
+export const getOnlyUsersComment = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    const userId = req.userId;
+    const comments = await CommentModel.find({ user: userId })
+      .populate("user", "username profilePic")
+      .lean()
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    if (!comments) {
+      res.status(404).json({
+        success: false,
+        message: "Comments not found.",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      comments,
+    });
+  } catch (error) {
+    console.error("[getCommentsById]", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong while fetching the comments.",
+    });
+  }
+};

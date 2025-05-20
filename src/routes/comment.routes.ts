@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   deleteComment,
   getCommentsByPostId,
+  getOnlyUsersComment,
   handleCommentVote,
   uploadComment,
 } from "../controllers/comment.controller";
@@ -16,5 +17,7 @@ router.get("/getComments/:postId", isAuthenticated, getCommentsByPostId);
 router.delete("/deleteComment/:commentId", isAuthenticated, deleteComment);
 
 router.patch("/commentVoteToggle", isAuthenticated, handleCommentVote);
+
+router.get("/getOnlyUserComments", isAuthenticated, getOnlyUsersComment);
 
 export default router;
