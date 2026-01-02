@@ -12,11 +12,11 @@ const app = express();
 
 app.use(express.json());
 
+app.use(express.urlencoded({ extended: true }));
+
 app.use(
   cors({
-    origin: [
-      "https://9e60-2401-4900-5043-3ffd-656a-8eae-73b7-d4e3.ngrok-free.app",
-    ],
+    origin: ["https://be15a97bfd3b.ngrok-free.app"],
     credentials: true,
   })
 );
