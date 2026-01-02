@@ -69,6 +69,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const { accessToken, refreshToken } = generateTokens(user?._id as string);
 
+    const today = new Date().toISOString().split("T")[0];
+    const timestamp = new Date();
+
+    await User.findByIdAndUpdate(user._id, {
+      $push: {
+        sessionTime: {
+          timestamp,
+          date: today,
+          duration: 0, // Will be updated when session ends
+          sessionType: "login",
+        },
+      },
+    });
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -11,6 +11,12 @@ export interface IUser extends Document {
   buzzCoins: string;
   followers: mongoose.Schema.Types.ObjectId;
   following: mongoose.Schema.Types.ObjectId;
+  sessionTime: Array<{
+    timestamp: Date;
+    date: string; // YYYY-MM-DD format for easy querying
+    duration: number; // in minutes
+    sessionType: "login" | "app_open";
+  }>;
 }
 
 const UserSchema: Schema = new Schema(
@@ -40,6 +46,18 @@ const UserSchema: Schema = new Schema(
     buzzCoins: { type: Number, default: 0 },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    sessionTime: [
+      {
+        timestamp: { type: Date, default: Date.now },
+        date: { type: String, required: true },
+        duration: { type: Number, required: true }, // in minutes
+        sessionType: {
+          type: String,
+          enum: ["login", "app_open"],
+          default: "app_open",
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
